@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SLM Cost Estimator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    // STLLoader - clean implementation
+    THREE.STLLoader = function() {};
+    THREE.STLLoader.prototype = {
+      constructor: THREE.STLLoader,
+      parse: function(data) {
+        function isBinary(data) {
+          var reader = new DataView(data);
+          var faceCount = reader.getUint32(80, true);
+          var expectedSize = 80 + 4 + faceCount * 50;
+          if (expectedSize === data.byteLength) return true;
+          // Check for 'solid' at start (ASCII)
+          var header = new Uint8Array(data, 0, 5);
+          var str = String.fromCharCode.apply(null, header);
+          return str !== 'solid';
+        }
+        
+        function parseBinary(data) {
+          var reader = new DataView(data);
+          var faces = reader.getUint32(80, true);
+          var positions = new Float32Array(faces * 9);
+          var normals = new Float32Array(faces * 9);
+          var offset = 84;
+          
+          for (var face = 0; face < faces; face++) {
+            var nx = reader.getFloat32(offset, true);
+            var ny = reader.getFloat32(offset + 4, true);
+            var nz = reader.getFloat32(offset + 8, true);
+            offset += 12;
+            
+            for (var v = 0; v < 3; v++) {
+              var idx = face * 9 + v * 3;
+              positions[idx] = reader.getFloat32(offset, true);
+              positions[idx + 1] = reader.getFloat32(offset + 4, true);
+              positions[idx + 2] = reader.getFloat32(offset + 8, true);
+              normals[idx] = nx;
+              normals[idx + 1] = ny;
+              normals[idx + 2] = nz;
+              offset += 12;
+            }
+            offset += 2; // attribute byte count
+          }
+          
+          var geometry = new THREE.BufferGeometry();
+          geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+          geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+          return geometry;
+        }
+        
+        function parseASCII(data) {
+          var text = typeof data === 'string' ? data : new TextDecoder().decode(new Uint8Array(data));
+          var vertexRegex = /vertex\s+([\-+]?\d*\.?\d+(?:[eE][\-+]?\d+)?)\s+([\-+]?\d*\.?\d+(?:[eE][\-+]?\d+)?)\s+([\-+]?\d*\.?\d+(?:[eE][\-+]?\d+)?)/g;
+          var normalRegex = /facet\s+normal\s+([\-+]?\d*\.?\d+(?:[eE][\-+]?\d+)?)\s+([\-+]?\d*\.?\d+(?:[eE][\-+]?\d+)?)\s+([\-+]?\d*\.?\d+(?:[eE][\-+]?\d+)?)/g;
+          
+          var vertices = [];
+          var normals = [];
+          var match;
+          
+          // Extract normals
+          var normalList = [];
+          while ((match = normalRegex.exec(text)) !== null) {
+            normalList.push([parseFloat(match[1]), parseFloat(match[2]), parseFloat(match[3])]);
+          }
+          
+          // Extract vertices
+          var faceIdx = 0;
+          var vertIdx = 0;
+          while ((match = vertexRegex.exec(text)) !== null) {
+            vertices.push(parseFloat(match[1]), parseFloat(match[2]), parseFloat(match[3]));
+            if (normalList[faceIdx]) {
+              normals.push(normalList[faceIdx][0], normalList[faceIdx][1], normalList[faceIdx][2]);
+            } else {
+              normals.push(0, 0, 1);
+            }
+            vertIdx++;
+            if (vertIdx % 3 === 0) faceIdx++;
+          }
+          
+          var geometry = new THREE.BufferGeometry();
+          geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+          geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normals), 3));
+          return geometry;
+        }
+        
+        if (isBinary(data)) {
+          return parseBinary(data);
+        } else {
+          return parseASCII(data);
+        }
+      }
+    };
+  </script>
+  <script>
+    // OrbitControls for r128
+    THREE.OrbitControls = function(object, domElement) {
+      this.object = object;
+      this.domElement = domElement;
+      this.target = new THREE.Vector3();
+      this.minDistance = 0;
+      this.maxDistance = Infinity;
+      this.enableDamping = false;
+      this.dampingFactor = 0.05;
+      this.enableZoom = true;
+      this.zoomSpeed = 1.0;
+      this.enableRotate = true;
+      this.rotateSpeed = 1.0;
+      this.enablePan = true;
+      this.panSpeed = 1.0;
+      
+      var scope = this;
+      var spherical = new THREE.Spherical();
+      var sphericalDelta = new THREE.Spherical();
+      var scale = 1;
+      var panOffset = new THREE.Vector3();
+      var rotateStart = new THREE.Vector2();
+      var rotateEnd = new THREE.Vector2();
+      var rotateDelta = new THREE.Vector2();
+      var panStart = new THREE.Vector2();
+      var panEnd = new THREE.Vector2();
+      var panDelta = new THREE.Vector2();
+      var dollyStart = new THREE.Vector2();
+      var dollyEnd = new THREE.Vector2();
+      var dollyDelta = new THREE.Vector2();
+      var STATE = { NONE: -1, ROTATE: 0, DOLLY: 1, PAN: 2 };
+      var state = STATE.NONE;
+      
+      this.update = function() {
+        var offset = new THREE.Vector3();
+        var quat = new THREE.Quaternion().setFromUnitVectors(object.up, new THREE.Vector3(0, 1, 0));
+        var quatInverse = quat.clone().invert();
+        var lastPosition = new THREE.Vector3();
+        var lastQuaternion = new THREE.Quaternion();
+        
+        return function update() {
+          var position = scope.object.position;
+          offset.copy(position).sub(scope.target);
+          offset.applyQuaternion(quat);
+          spherical.setFromVector3(offset);
+          spherical.theta += sphericalDelta.theta;
+          spherical.phi += sphericalDelta.phi;
+          spherical.phi = Math.max(0.01, Math.min(Math.PI - 0.01, spherical.phi));
+          spherical.radius *= scale;
+          spherical.radius = Math.max(scope.minDistance, Math.min(scope.maxDistance, spherical.radius));
+          scope.target.add(panOffset);
+          offset.setFromSpherical(spherical);
+          offset.applyQuaternion(quatInverse);
+          position.copy(scope.target).add(offset);
+          scope.object.lookAt(scope.target);
+          if (scope.enableDamping) {
+            sphericalDelta.theta *= (1 - scope.dampingFactor);
+            sphericalDelta.phi *= (1 - scope.dampingFactor);
+            panOffset.multiplyScalar(1 - scope.dampingFactor);
+          } else {
+            sphericalDelta.set(0, 0, 0);
+            panOffset.set(0, 0, 0);
+          }
+          scale = 1;
+          return false;
+        };
+      }();
+      
+      function onMouseDown(event) {
+        event.preventDefault();
+        if (event.button === 0) {
+          state = STATE.ROTATE;
+          rotateStart.set(event.clientX, event.clientY);
+        } else if (event.button === 1) {
+          state = STATE.DOLLY;
+          dollyStart.set(event.clientX, event.clientY);
+        } else if (event.button === 2) {
+          state = STATE.PAN;
+          panStart.set(event.clientX, event.clientY);
+        }
+        document.addEventListener('mousemove', onMouseMove, false);
+        document.addEventListener('mouseup', onMouseUp, false);
+      }
+      
+      function onMouseMove(event) {
+        event.preventDefault();
+        if (state === STATE.ROTATE) {
+          rotateEnd.set(event.clientX, event.clientY);
+          rotateDelta.subVectors(rotateEnd, rotateStart).multiplyScalar(scope.rotateSpeed);
+          sphericalDelta.theta -= 2 * Math.PI * rotateDelta.x / domElement.clientHeight;
+          sphericalDelta.phi -= 2 * Math.PI * rotateDelta.y / domElement.clientHeight;
+          rotateStart.copy(rotateEnd);
+        } else if (state === STATE.DOLLY) {
+          dollyEnd.set(event.clientX, event.clientY);
+          dollyDelta.subVectors(dollyEnd, dollyStart);
+          if (dollyDelta.y > 0) scale /= Math.pow(0.95, scope.zoomSpeed);
+          else if (dollyDelta.y < 0) scale *= Math.pow(0.95, scope.zoomSpeed);
+          dollyStart.copy(dollyEnd);
+        } else if (state === STATE.PAN) {
+          panEnd.set(event.clientX, event.clientY);
+          panDelta.subVectors(panEnd, panStart).multiplyScalar(scope.panSpeed);
+          var offset = new THREE.Vector3();
+          offset.setFromMatrixColumn(scope.object.matrix, 0);
+          offset.multiplyScalar(-panDelta.x * 0.01 * spherical.radius);
+          panOffset.add(offset);
+          offset.setFromMatrixColumn(scope.object.matrix, 1);
+          offset.multiplyScalar(panDelta.y * 0.01 * spherical.radius);
+          panOffset.add(offset);
+          panStart.copy(panEnd);
+        }
+        scope.update();
+      }
+      
+      function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove, false);
+        document.removeEventListener('mouseup', onMouseUp, false);
+        state = STATE.NONE;
+      }
+      
+      function onWheel(event) {
+        event.preventDefault();
+        if (event.deltaY > 0) scale /= Math.pow(0.95, scope.zoomSpeed);
+        else if (event.deltaY < 0) scale *= Math.pow(0.95, scope.zoomSpeed);
+        scope.update();
+      }
+      
+      function onContextMenu(event) { event.preventDefault(); }
+      
+      domElement.addEventListener('mousedown', onMouseDown, false);
+      domElement.addEventListener('wheel', onWheel, { passive: false });
+      domElement.addEventListener('contextmenu', onContextMenu, false);
+      
+      this.update();
+    };
+  </script>
+</head>
+<body>
+  <header class="topbar glass">
+    <div class="title">SLM Стоимостной прототип</div>
+    <div class="subtitle">Фаза 1: локальный HTML/JS</div>
+  </header>
+
+  <main class="layout">
+    <section class="panel glass">
+      <h2>1) Загрузка STL</h2>
+      <div id="dropzone" class="dropzone">
+        <input type="file" id="fileInput" accept=".stl" hidden>
+        <p class="drop-hint">Перетащите STL сюда или <button id="browseBtn" type="button">выберите файл</button></p>
+        <p class="file-name" id="fileName">Файл не выбран</p>
+      </div>
+      <button id="demoBtn" class="ghost" type="button">Загрузить демо STL (куб 10 мм)</button>
+      <div class="geometry">
+        <div>Объём: <span id="volumeValue">—</span></div>
+        <div>Площадь: <span id="areaValue">—</span></div>
+        <div>Габариты (мм): <span id="bboxValue">—</span></div>
+        <div>Масса (кг): <span id="massValue">—</span></div>
+        <div class="note">* Объём и масса обновятся после выбора материала/плотности</div>
+      </div>
+    </section>
+
+    <section class="panel glass">
+      <h2>2) Параметры расчёта</h2>
+      <div class="grid">
+        <label>Цена материала, руб/кг
+          <input type="number" id="materialPrice" value="3000" step="10">
+        </label>
+        <label>Плотность, г/см³
+          <input type="number" id="density" value="4.5" step="0.01">
+        </label>
+        <label>Коэф. брака/запаса, %
+          <input type="number" id="scrap" value="5" step="1">
+        </label>
+        <label>Ставка машины, руб/час
+          <input type="number" id="machineRate" value="2500" step="50">
+        </label>
+        <label>Производительность, см³/час (опц.)
+          <input type="number" id="productivity" value="20" step="1">
+        </label>
+        <label>Время печати, час (если знаете)
+          <input type="number" id="manualTime" value="0" step="0.1">
+        </label>
+        <label>Надбавка/маржа, %
+          <input type="number" id="margin" value="15" step="1">
+        </label>
+        <label>Кол-во деталей
+          <input type="number" id="quantity" value="1" step="1" min="1">
+        </label>
+      </div>
+      <button id="calcBtn" class="primary">Рассчитать</button>
+      <div class="formula glass" id="formulaBlock">
+        <div class="formula-title">Формула</div>
+        <div id="formulaText">Введите параметры и загрузите STL</div>
+        <div class="formula-note">Формула и пояснения обновляются после расчёта.</div>
+      </div>
+    </section>
+
+    <section class="panel glass">
+      <h2>3) Предпросмотр модели</h2>
+      <div id="viewer" class="viewer"></div>
+    </section>
+
+    <section class="panel glass">
+      <h2>4) Итоги</h2>
+      <div class="results">
+        <div>Стоимость за шт.: <span id="unitCost">—</span></div>
+        <div>Стоимость позиции: <span id="lineCost">—</span></div>
+      </div>
+      <div class="export">
+        <label>№
+          <input type="number" id="lineIndex" value="1" step="1" min="1">
+        </label>
+        <label>Деталь
+          <input type="text" id="partName" value="Деталь STL">
+        </label>
+        <button id="copyRow" class="ghost">Скопировать строку</button>
+        <button id="downloadCsv" class="ghost">Скачать CSV</button>
+        <div class="note" id="exportPreview">№ - Деталь - Стоимость за шт. - Кол-во - Стоимость позиции</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
