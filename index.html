@@ -213,38 +213,10 @@
   </header>
 
   <main class="layout-v11">
-    <!-- Left column: STL + Viewer -->
+    <!-- Left column: Material + Machine + Consumables -->
     <div class="col-left">
       <section class="panel glass">
-        <h2>1. Загрузка STL</h2>
-        <div id="dropzone" class="dropzone">
-          <input type="file" id="fileInput" accept=".stl" hidden>
-          <p class="drop-hint">Перетащите STL сюда или <button id="browseBtn" type="button">выберите файл</button></p>
-          <p class="file-name" id="fileName">Файл не выбран</p>
-        </div>
-        <button id="demoBtn" class="ghost" type="button">Демо: куб 10×10×10 мм</button>
-      </section>
-
-      <section class="panel glass">
-        <h2>2. Геометрия детали</h2>
-        <div class="geo-grid">
-          <div class="geo-item"><span class="geo-label">Объём детали</span><span class="geo-value" id="volumeValue">—</span></div>
-          <div class="geo-item"><span class="geo-label">Высота (Z)</span><span class="geo-value" id="heightValue">—</span></div>
-          <div class="geo-item"><span class="geo-label">Габариты</span><span class="geo-value" id="bboxValue">—</span></div>
-          <div class="geo-item"><span class="geo-label">Площадь</span><span class="geo-value" id="areaValue">—</span></div>
-        </div>
-      </section>
-
-      <section class="panel glass viewer-panel">
-        <h2>3. Предпросмотр</h2>
-        <div id="viewer" class="viewer"></div>
-      </section>
-    </div>
-
-    <!-- Center column: Parameters -->
-    <div class="col-center">
-      <section class="panel glass">
-        <h2>4. Материал</h2>
+        <h2>1. Материал</h2>
         <div class="form-row">
           <label>Сплав
             <select id="materialSelect">
@@ -272,7 +244,7 @@
       </section>
 
       <section class="panel glass">
-        <h2>5. Машина</h2>
+        <h2>2. Машина</h2>
         <div class="form-grid">
           <label>Платформа X, мм
             <input type="number" id="bedX" value="350" step="10">
@@ -290,7 +262,59 @@
       </section>
 
       <section class="panel glass">
-        <h2>6. Время работ (часы)</h2>
+        <h2>3. Расходники</h2>
+        <div class="form-grid">
+          <label>Обработка платформы, руб
+            <input type="number" id="costPlatform" value="3000" step="100">
+          </label>
+          <label>Баллон газа, руб
+            <input type="number" id="costGas" value="4000" step="100">
+          </label>
+          <label>Газ: часов на баллон
+            <input type="number" id="gasHours" value="30" step="1">
+          </label>
+          <label>Фильтр, руб
+            <input type="number" id="costFilter" value="7000" step="100">
+          </label>
+          <label>Фильтр: часов на замену
+            <input type="number" id="filterHours" value="48" step="1">
+          </label>
+        </div>
+      </section>
+    </div>
+
+    <!-- Center column: STL + Geometry + Viewer -->
+    <div class="col-center">
+      <section class="panel glass">
+        <h2>4. Загрузка STL</h2>
+        <div id="dropzone" class="dropzone">
+          <input type="file" id="fileInput" accept=".stl" hidden>
+          <p class="drop-hint">Перетащите STL сюда или <button id="browseBtn" type="button">выберите файл</button></p>
+          <p class="file-name" id="fileName">Файл не выбран</p>
+        </div>
+        <button id="demoBtn" class="ghost" type="button">Демо: куб 10×10×10 мм</button>
+      </section>
+
+      <section class="panel glass">
+        <h2>5. Геометрия детали</h2>
+        <div class="geo-grid">
+          <div class="geo-item"><span class="geo-label">Объём детали</span><span class="geo-value" id="volumeValue">—</span></div>
+          <div class="geo-item"><span class="geo-label">Высота (Z)</span><span class="geo-value" id="heightValue">—</span></div>
+          <div class="geo-item"><span class="geo-label">Габариты</span><span class="geo-value" id="bboxValue">—</span></div>
+          <div class="geo-item"><span class="geo-label">Площадь</span><span class="geo-value" id="areaValue">—</span></div>
+        </div>
+      </section>
+
+      <section class="panel glass viewer-panel">
+        <h2>6. Предпросмотр модели</h2>
+        <div id="viewer" class="viewer"></div>
+      </section>
+    </div>
+
+    <!-- Right column: Time + Personnel + Pricing + Results -->
+    <div class="col-right">
+      <section class="panel glass">
+        <h2>7. Время работ (часы)</h2>
         <div class="form-grid time-grid">
           <label>Компоновка камеры
             <input type="number" id="timeLayout" value="2" step="0.5">
@@ -320,7 +344,7 @@
       </section>
 
       <section class="panel glass">
-        <h2>7. Персонал</h2>
+        <h2>8. Персонал</h2>
         <div class="form-grid">
           <label>Инженеров (подготовка)
             <input type="number" id="numEngineers" value="2" step="1" min="1">
@@ -342,27 +366,6 @@
       </section>
 
       <section class="panel glass">
-        <h2>8. Расходники</h2>
-        <div class="form-grid">
-          <label>Обработка платформы, руб
-            <input type="number" id="costPlatform" value="3000" step="100">
-          </label>
-          <label>Баллон газа, руб
-            <input type="number" id="costGas" value="4000" step="100">
-          </label>
-          <label>Газ: часов на баллон
-            <input type="number" id="gasHours" value="30" step="1">
-          </label>
-          <label>Фильтр, руб
-            <input type="number" id="costFilter" value="7000" step="100">
-          </label>
-          <label>Фильтр: часов на замену
-            <input type="number" id="filterHours" value="48" step="1">
-          </label>
-        </div>
-      </section>
-
-      <section class="panel glass">
         <h2>9. Наценка</h2>
         <div class="form-grid">
           <label>Маржа / прибыль, %
@@ -376,10 +379,7 @@
           </label>
         </div>
       </section>
-    </div>
 
-    <!-- Right column: Results -->
-    <div class="col-right">
       <section class="panel glass">
         <h2>Расчёт</h2>
         <button id="calcBtn" class="primary large">Рассчитать стоимость</button>
@@ -445,3 +445,4 @@
   <script src="app.js"></script>
 </body>
 </html>
+
