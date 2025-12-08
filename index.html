@@ -281,38 +281,7 @@
           </label>
         </div>
       </section>
-    </div>
 
-    <!-- Center column: STL + Geometry + Viewer -->
-    <div class="col-center">
-      <section class="panel glass">
-        <h2>4. Загрузка STL</h2>
-        <div id="dropzone" class="dropzone">
-          <input type="file" id="fileInput" accept=".stl" hidden>
-          <p class="drop-hint">Перетащите STL сюда или <button id="browseBtn" type="button">выберите файл</button></p>
-          <p class="file-name" id="fileName">Файл не выбран</p>
-        </div>
-        <button id="demoBtn" class="ghost" type="button">Демо: куб 10×10×10 мм</button>
-      </section>
-
-      <section class="panel glass">
-        <h2>5. Геометрия детали</h2>
-        <div class="geo-grid">
-          <div class="geo-item"><span class="geo-label">Объём детали</span><span class="geo-value" id="volumeValue">—</span></div>
-          <div class="geo-item"><span class="geo-label">Высота (Z)</span><span class="geo-value" id="heightValue">—</span></div>
-          <div class="geo-item"><span class="geo-label">Габариты</span><span class="geo-value" id="bboxValue">—</span></div>
-          <div class="geo-item"><span class="geo-label">Площадь</span><span class="geo-value" id="areaValue">—</span></div>
-        </div>
-      </section>
-
-      <section class="panel glass viewer-panel">
-        <h2>6. Предпросмотр модели</h2>
-        <div id="viewer" class="viewer"></div>
-      </section>
-    </div>
-
-    <!-- Right column: Time + Personnel + Pricing + Results -->
-    <div class="col-right">
       <section class="panel glass">
         <h2>7. Время работ (часы)</h2>
         <div class="form-grid time-grid">
@@ -364,7 +333,38 @@
           <p><strong>Техники:</strong> распаковка, термо, EDM, мехобработка, абразивная</p>
         </div>
       </section>
+    </div>
 
+    <!-- Right column: STL + Geometry + Viewer -->
+    <div class="col-right">
+      <section class="panel glass">
+        <h2>4. Загрузка STL</h2>
+        <div id="dropzone" class="dropzone">
+          <input type="file" id="fileInput" accept=".stl" hidden>
+          <p class="drop-hint">Перетащите STL сюда или <button id="browseBtn" type="button">выберите файл</button></p>
+          <p class="file-name" id="fileName">Файл не выбран</p>
+        </div>
+        <button id="demoBtn" class="ghost" type="button">Демо: куб 10×10×10 мм</button>
+      </section>
+
+      <section class="panel glass">
+        <h2>5. Геометрия детали</h2>
+        <div class="geo-grid">
+          <div class="geo-item"><span class="geo-label">Объём детали</span><span class="geo-value" id="volumeValue">—</span></div>
+          <div class="geo-item"><span class="geo-label">Высота (Z)</span><span class="geo-value" id="heightValue">—</span></div>
+          <div class="geo-item"><span class="geo-label">Габариты</span><span class="geo-value" id="bboxValue">—</span></div>
+          <div class="geo-item"><span class="geo-label">Площадь</span><span class="geo-value" id="areaValue">—</span></div>
+        </div>
+      </section>
+
+      <section class="panel glass viewer-panel">
+        <h2>6. Предпросмотр модели</h2>
+        <div id="viewer" class="viewer"></div>
+      </section>
+    </div>
+
+    <!-- Bottom section: Pricing + Results + Breakdown + Export -->
+    <div class="col-bottom">
       <section class="panel glass">
         <h2>9. Наценка</h2>
         <div class="form-grid">
