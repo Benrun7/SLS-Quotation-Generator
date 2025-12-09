@@ -1,60 +1,51 @@
-# SLM Price Calculator
+# SLS Quotation Generator
 
-Express cost estimation tool for SLM/DMLS 3D-printed parts based on STL geometry.
+Простой инструмент для оценки стоимости STL-моделей по тарифу.
 
-## Features
+## Возможности
 
-### Phase 1 (Current) — Static HTML/JS Prototype
-- **STL Upload**: Drag & drop, file picker, or demo cube
-- **3D Viewer**: Interactive preview with orbit controls
-- **Geometry Analysis**: Volume (cm³), surface area (cm²), bounding box (mm)
-- **Cost Calculation**:
-  - Material cost = mass × price/kg × scrap factor
-  - Machine cost = time × hourly rate
-  - Final price = (material + machine) × margin
-- **Export**: Copy row or download CSV in format `№ - Part - Unit Price - Qty - Line Total`
+- **Загрузка STL** — drag & drop или выбор файлов, поддержка множественной загрузки
+- **Простая формула** — `Цена = Тариф (₽/см³) × Объём (см³)`
+- **Таблица моделей** — с сортировкой по любой колонке
+- **Редактируемое количество** — для каждой позиции
+- **Гибкий экспорт** — выбор колонок чекбоксами, формат для Google Sheets
+- **Единицы объёма** — см³ или мм³ на выбор
 
-### User Inputs
-| Parameter | Default | Unit |
-|-----------|---------|------|
-| Material price | 3000 | RUB/kg |
-| Density | 4.5 | g/cm³ |
-| Scrap factor | 5 | % |
-| Machine rate | 2500 | RUB/hour |
-| Productivity | 20 | cm³/hour |
-| Manual time | 0 | hours |
-| Margin | 15 | % |
-| Quantity | 1 | pcs |
+## Быстрый старт
 
-## Quick Start
-
-1. Open `index.html` in a browser (or run a local server)
-2. Upload an STL file (binary or ASCII)
-3. Adjust parameters
-4. Click **Рассчитать** (Calculate)
-5. Export the quote row
+1. Откройте `index.html` в браузере
+2. Установите тариф (₽/см³)
+3. Загрузите STL-файлы
+4. Настройте количество для каждой модели
+5. Скопируйте результат в буфер обмена
 
 ```bash
-# Optional: run local server
+# Опционально: локальный сервер
 python -m http.server 8000
-# Open http://localhost:8000
+# Открыть http://localhost:8000
 ```
 
-## Tech Stack
+## Формат экспорта
 
-- **Frontend**: Vanilla HTML/CSS/JS
-- **3D**: Three.js r128 (embedded STLLoader + OrbitControls)
-- **UI**: Glassmorphism, dark theme, Inter font
+Данные копируются с табуляцией как разделителем — при вставке в Google Sheets каждое значение попадает в отдельную ячейку.
 
-## Roadmap — Phase 2
+**Доступные колонки:**
+| Колонка | Описание |
+|---------|----------|
+| № | Порядковый номер |
+| Наименование | Имя файла без .stl |
+| Объём | В см³ или мм³ |
+| Цена/шт | Тариф × Объём |
+| Кол-во | Количество единиц |
+| Стоимость | Цена × Кол-во |
 
-- [ ] Backend (FastAPI or Node)
-- [ ] Material/process configs (JSON/YAML)
-- [ ] Quote persistence (DB)
-- [ ] Improved STL viewer (orientation, supports estimate)
-- [ ] Auth & rate limiting
-- [ ] Unit tests for formulas
+## Технологии
 
-## License
+- **Frontend**: HTML / CSS / JavaScript (без фреймворков)
+- **STL Parser**: Встроенный парсер binary + ASCII форматов
+- **Шрифты**: Outfit + JetBrains Mono
+- **Тема**: Тёмная с оранжевым акцентом
+
+## Лицензия
 
 MIT
