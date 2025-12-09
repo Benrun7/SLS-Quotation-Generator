@@ -3,446 +3,140 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SLM Cost Estimator v1.1</title>
+  <title>SLS Quotation Generator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script>
-    // STLLoader - clean implementation
-    THREE.STLLoader = function() {};
-    THREE.STLLoader.prototype = {
-      constructor: THREE.STLLoader,
-      parse: function(data) {
-        function isBinary(data) {
-          var reader = new DataView(data);
-          var faceCount = reader.getUint32(80, true);
-          var expectedSize = 80 + 4 + faceCount * 50;
-          if (expectedSize === data.byteLength) return true;
-          var header = new Uint8Array(data, 0, 5);
-          var str = String.fromCharCode.apply(null, header);
-          return str !== 'solid';
-        }
-        function parseBinary(data) {
-          var reader = new DataView(data);
-          var faces = reader.getUint32(80, true);
-          var positions = new Float32Array(faces * 9);
-          var normals = new Float32Array(faces * 9);
-          var offset = 84;
-          for (var face = 0; face < faces; face++) {
-            var nx = reader.getFloat32(offset, true);
-            var ny = reader.getFloat32(offset + 4, true);
-            var nz = reader.getFloat32(offset + 8, true);
-            offset += 12;
-            for (var v = 0; v < 3; v++) {
-              var idx = face * 9 + v * 3;
-              positions[idx] = reader.getFloat32(offset, true);
-              positions[idx + 1] = reader.getFloat32(offset + 4, true);
-              positions[idx + 2] = reader.getFloat32(offset + 8, true);
-              normals[idx] = nx;
-              normals[idx + 1] = ny;
-              normals[idx + 2] = nz;
-              offset += 12;
-            }
-            offset += 2;
-          }
-          var geometry = new THREE.BufferGeometry();
-          geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-          geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-          return geometry;
-        }
-        function parseASCII(data) {
-          var text = typeof data === 'string' ? data : new TextDecoder().decode(new Uint8Array(data));
-          var vertexRegex = /vertex\s+([\-+]?\d*\.?\d+(?:[eE][\-+]?\d+)?)\s+([\-+]?\d*\.?\d+(?:[eE][\-+]?\d+)?)\s+([\-+]?\d*\.?\d+(?:[eE][\-+]?\d+)?)/g;
-          var normalRegex = /facet\s+normal\s+([\-+]?\d*\.?\d+(?:[eE][\-+]?\d+)?)\s+([\-+]?\d*\.?\d+(?:[eE][\-+]?\d+)?)\s+([\-+]?\d*\.?\d+(?:[eE][\-+]?\d+)?)/g;
-          var vertices = [];
-          var normals = [];
-          var match;
-          var normalList = [];
-          while ((match = normalRegex.exec(text)) !== null) {
-            normalList.push([parseFloat(match[1]), parseFloat(match[2]), parseFloat(match[3])]);
-          }
-          var faceIdx = 0;
-          var vertIdx = 0;
-          while ((match = vertexRegex.exec(text)) !== null) {
-            vertices.push(parseFloat(match[1]), parseFloat(match[2]), parseFloat(match[3]));
-            if (normalList[faceIdx]) {
-              normals.push(normalList[faceIdx][0], normalList[faceIdx][1], normalList[faceIdx][2]);
-            } else {
-              normals.push(0, 0, 1);
-            }
-            vertIdx++;
-            if (vertIdx % 3 === 0) faceIdx++;
-          }
-          var geometry = new THREE.BufferGeometry();
-          geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
-          geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normals), 3));
-          return geometry;
-        }
-        if (isBinary(data)) {
-          return parseBinary(data);
-        } else {
-          return parseASCII(data);
-        }
-      }
-    };
-  </script>
-  <script>
-    // OrbitControls for r128
-    THREE.OrbitControls = function(object, domElement) {
-      this.object = object;
-      this.domElement = domElement;
-      this.target = new THREE.Vector3();
-      this.minDistance = 0;
-      this.maxDistance = Infinity;
-      this.enableDamping = false;
-      this.dampingFactor = 0.05;
-      this.enableZoom = true;
-      this.zoomSpeed = 1.0;
-      this.enableRotate = true;
-      this.rotateSpeed = 1.0;
-      this.enablePan = true;
-      this.panSpeed = 1.0;
-      var scope = this;
-      var spherical = new THREE.Spherical();
-      var sphericalDelta = new THREE.Spherical();
-      var scale = 1;
-      var panOffset = new THREE.Vector3();
-      var rotateStart = new THREE.Vector2();
-      var rotateEnd = new THREE.Vector2();
-      var rotateDelta = new THREE.Vector2();
-      var panStart = new THREE.Vector2();
-      var panEnd = new THREE.Vector2();
-      var panDelta = new THREE.Vector2();
-      var dollyStart = new THREE.Vector2();
-      var dollyEnd = new THREE.Vector2();
-      var dollyDelta = new THREE.Vector2();
-      var STATE = { NONE: -1, ROTATE: 0, DOLLY: 1, PAN: 2 };
-      var state = STATE.NONE;
-      this.update = function() {
-        var offset = new THREE.Vector3();
-        var quat = new THREE.Quaternion().setFromUnitVectors(object.up, new THREE.Vector3(0, 1, 0));
-        var quatInverse = quat.clone().invert();
-        return function update() {
-          var position = scope.object.position;
-          offset.copy(position).sub(scope.target);
-          offset.applyQuaternion(quat);
-          spherical.setFromVector3(offset);
-          spherical.theta += sphericalDelta.theta;
-          spherical.phi += sphericalDelta.phi;
-          spherical.phi = Math.max(0.01, Math.min(Math.PI - 0.01, spherical.phi));
-          spherical.radius *= scale;
-          spherical.radius = Math.max(scope.minDistance, Math.min(scope.maxDistance, spherical.radius));
-          scope.target.add(panOffset);
-          offset.setFromSpherical(spherical);
-          offset.applyQuaternion(quatInverse);
-          position.copy(scope.target).add(offset);
-          scope.object.lookAt(scope.target);
-          if (scope.enableDamping) {
-            sphericalDelta.theta *= (1 - scope.dampingFactor);
-            sphericalDelta.phi *= (1 - scope.dampingFactor);
-            panOffset.multiplyScalar(1 - scope.dampingFactor);
-          } else {
-            sphericalDelta.set(0, 0, 0);
-            panOffset.set(0, 0, 0);
-          }
-          scale = 1;
-          return false;
-        };
-      }();
-      function onMouseDown(event) {
-        event.preventDefault();
-        if (event.button === 0) { state = STATE.ROTATE; rotateStart.set(event.clientX, event.clientY); }
-        else if (event.button === 1) { state = STATE.DOLLY; dollyStart.set(event.clientX, event.clientY); }
-        else if (event.button === 2) { state = STATE.PAN; panStart.set(event.clientX, event.clientY); }
-        document.addEventListener('mousemove', onMouseMove, false);
-        document.addEventListener('mouseup', onMouseUp, false);
-      }
-      function onMouseMove(event) {
-        event.preventDefault();
-        if (state === STATE.ROTATE) {
-          rotateEnd.set(event.clientX, event.clientY);
-          rotateDelta.subVectors(rotateEnd, rotateStart).multiplyScalar(scope.rotateSpeed);
-          sphericalDelta.theta -= 2 * Math.PI * rotateDelta.x / domElement.clientHeight;
-          sphericalDelta.phi -= 2 * Math.PI * rotateDelta.y / domElement.clientHeight;
-          rotateStart.copy(rotateEnd);
-        } else if (state === STATE.DOLLY) {
-          dollyEnd.set(event.clientX, event.clientY);
-          dollyDelta.subVectors(dollyEnd, dollyStart);
-          if (dollyDelta.y > 0) scale /= Math.pow(0.95, scope.zoomSpeed);
-          else if (dollyDelta.y < 0) scale *= Math.pow(0.95, scope.zoomSpeed);
-          dollyStart.copy(dollyEnd);
-        } else if (state === STATE.PAN) {
-          panEnd.set(event.clientX, event.clientY);
-          panDelta.subVectors(panEnd, panStart).multiplyScalar(scope.panSpeed);
-          var offset = new THREE.Vector3();
-          offset.setFromMatrixColumn(scope.object.matrix, 0);
-          offset.multiplyScalar(-panDelta.x * 0.01 * spherical.radius);
-          panOffset.add(offset);
-          offset.setFromMatrixColumn(scope.object.matrix, 1);
-          offset.multiplyScalar(panDelta.y * 0.01 * spherical.radius);
-          panOffset.add(offset);
-          panStart.copy(panEnd);
-        }
-        scope.update();
-      }
-      function onMouseUp() {
-        document.removeEventListener('mousemove', onMouseMove, false);
-        document.removeEventListener('mouseup', onMouseUp, false);
-        state = STATE.NONE;
-      }
-      function onWheel(event) {
-        event.preventDefault();
-        if (event.deltaY > 0) scale /= Math.pow(0.95, scope.zoomSpeed);
-        else if (event.deltaY < 0) scale *= Math.pow(0.95, scope.zoomSpeed);
-        scope.update();
-      }
-      function onContextMenu(event) { event.preventDefault(); }
-      domElement.addEventListener('mousedown', onMouseDown, false);
-      domElement.addEventListener('wheel', onWheel, { passive: false });
-      domElement.addEventListener('contextmenu', onContextMenu, false);
-      this.update();
-    };
-  </script>
 </head>
 <body>
-  <header class="topbar glass">
-    <div class="title">SLM Калькулятор стоимости</div>
-    <div class="subtitle">v1.1 — Детальная модель расчёта</div>
-  </header>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <h1 class="logo">SLS Quotation</h1>
+      <p class="tagline">Быстрая оценка STL-моделей</p>
+    </header>
 
-  <main class="layout-v11">
-    <!-- Left column: Material + Machine + Consumables -->
-    <div class="col-left">
-      <section class="panel glass">
-        <h2>1. Материал</h2>
-        <div class="form-row">
-          <label>Сплав
-            <select id="materialSelect">
-              <option value="AlSi10Mg">AlSi10Mg (алюминий)</option>
-              <option value="316L">316L (нержавейка)</option>
-              <option value="Ti64" selected>Ti6Al4V (титан)</option>
-              <option value="custom">Свой материал...</option>
-            </select>
-          </label>
+    <!-- Settings -->
+    <section class="settings-bar">
+      <div class="tariff-input">
+        <label for="tariff">Тариф</label>
+        <div class="input-group">
+          <input type="number" id="tariff" value="50" min="0" step="1">
+          <span class="unit">₽/см³</span>
         </div>
-        <div class="form-grid">
-          <label>Цена порошка, руб/кг
-            <input type="number" id="materialPrice" value="15000" step="100">
-          </label>
-          <label>Плотность сплава, г/см³
-            <input type="number" id="densitySolid" value="4.43" step="0.01">
-          </label>
-          <label>Насыпная плотность, г/см³
-            <input type="number" id="densityPowder" value="2.2" step="0.01">
-          </label>
-          <label>Коэф. поддержек, %
-            <input type="number" id="supportFactor" value="15" step="1">
-          </label>
-        </div>
-      </section>
+      </div>
+    </section>
 
-      <section class="panel glass">
-        <h2>2. Машина</h2>
-        <div class="form-grid">
-          <label>Платформа X, мм
-            <input type="number" id="bedX" value="350" step="10">
-          </label>
-          <label>Платформа Y, мм
-            <input type="number" id="bedY" value="350" step="10">
-          </label>
-          <label>Производительность, см³/ч
-            <input type="number" id="productivity" value="6.5" step="0.5">
-          </label>
-          <label>Потери порошка, %
-            <input type="number" id="powderLoss" value="7" step="1">
-          </label>
-        </div>
-      </section>
-
-      <section class="panel glass">
-        <h2>3. Расходники</h2>
-        <div class="form-grid">
-          <label>Обработка платформы, руб
-            <input type="number" id="costPlatform" value="3000" step="100">
-          </label>
-          <label>Баллон газа, руб
-            <input type="number" id="costGas" value="4000" step="100">
-          </label>
-          <label>Газ: часов на баллон
-            <input type="number" id="gasHours" value="30" step="1">
-          </label>
-          <label>Фильтр, руб
-            <input type="number" id="costFilter" value="7000" step="100">
-          </label>
-          <label>Фильтр: часов на замену
-            <input type="number" id="filterHours" value="48" step="1">
-          </label>
-        </div>
-      </section>
-
-      <section class="panel glass">
-        <h2>7. Время работ (часы)</h2>
-        <div class="form-grid time-grid">
-          <label>Компоновка камеры
-            <input type="number" id="timeLayout" value="2" step="0.5">
-          </label>
-          <label>Подготовка машины
-            <input type="number" id="timeMachinePrep" value="2" step="0.5">
-          </label>
-          <label>Распаковка
-            <input type="number" id="timeUnpack" value="2" step="0.5">
-          </label>
-          <label>Термообработка
-            <input type="number" id="timeHeatTreat" value="2" step="0.5">
-          </label>
-          <label>Электроэрозия (EDM)
-            <input type="number" id="timeEDM" value="6" step="0.5">
-          </label>
-          <label>Мех. грубая
-            <input type="number" id="timeMachRough" value="0" step="0.5">
-          </label>
-          <label>Мех. тонкая
-            <input type="number" id="timeMachFine" value="0" step="0.5">
-          </label>
-          <label>Абразивная
-            <input type="number" id="timeAbrasive" value="0" step="0.5">
-          </label>
-        </div>
-      </section>
-
-      <section class="panel glass">
-        <h2>8. Персонал</h2>
-        <div class="form-grid">
-          <label>Инженеров (подготовка)
-            <input type="number" id="numEngineers" value="2" step="1" min="1">
-          </label>
-          <label>Ставка инженера, руб/ч
-            <input type="number" id="rateEngineer" value="1500" step="100">
-          </label>
-          <label>Техников (постобработка)
-            <input type="number" id="numTechnicians" value="3" step="1" min="1">
-          </label>
-          <label>Ставка техника, руб/ч
-            <input type="number" id="rateTechnician" value="600" step="50">
-          </label>
-        </div>
-        <div class="hint-box">
-          <p><strong>Инженеры:</strong> компоновка + подготовка машины + мониторинг (время печати ÷ 6)</p>
-          <p><strong>Техники:</strong> распаковка, термо, EDM, мехобработка, абразивная</p>
-        </div>
-      </section>
-    </div>
-
-    <!-- Right column: STL + Geometry + Viewer -->
-    <div class="col-right">
-      <section class="panel glass">
-        <h2>4. Загрузка STL</h2>
-        <div id="dropzone" class="dropzone">
-          <input type="file" id="fileInput" accept=".stl" hidden>
-          <p class="drop-hint">Перетащите STL сюда или <button id="browseBtn" type="button">выберите файл</button></p>
-          <p class="file-name" id="fileName">Файл не выбран</p>
-        </div>
-        <button id="demoBtn" class="ghost" type="button">Демо: куб 10×10×10 мм</button>
-      </section>
-
-      <section class="panel glass">
-        <h2>5. Геометрия детали</h2>
-        <div class="geo-grid">
-          <div class="geo-item"><span class="geo-label">Объём детали</span><span class="geo-value" id="volumeValue">—</span></div>
-          <div class="geo-item"><span class="geo-label">Высота (Z)</span><span class="geo-value" id="heightValue">—</span></div>
-          <div class="geo-item"><span class="geo-label">Габариты</span><span class="geo-value" id="bboxValue">—</span></div>
-          <div class="geo-item"><span class="geo-label">Площадь</span><span class="geo-value" id="areaValue">—</span></div>
-        </div>
-      </section>
-
-      <section class="panel glass viewer-panel">
-        <h2>6. Предпросмотр модели</h2>
-        <div id="viewer" class="viewer"></div>
-      </section>
-    </div>
-
-    <!-- Bottom section: Pricing + Results + Breakdown + Export -->
-    <div class="col-bottom">
-      <section class="panel glass">
-        <h2>9. Наценка</h2>
-        <div class="form-grid">
-          <label>Маржа / прибыль, %
-            <input type="number" id="margin" value="20" step="1">
-          </label>
-          <label>Накладные, руб
-            <input type="number" id="overhead" value="0" step="100">
-          </label>
-          <label>Кол-во деталей
-            <input type="number" id="quantity" value="1" step="1" min="1">
-          </label>
-        </div>
-      </section>
-
-      <section class="panel glass calc-panel">
-        <h2>Расчёт</h2>
-        <button id="calcBtn" class="primary large">Рассчитать стоимость</button>
-      </section>
-
-      <section class="panel glass results-panel">
-        <h2>10. Итоги</h2>
-        <div class="result-block">
-          <div class="result-row highlight">
-            <span class="result-label">Затраты на запуск</span>
-            <span class="result-value" id="launchCost">—</span>
+    <!-- Dropzone -->
+    <section class="upload-section">
+      <div id="dropzone" class="dropzone">
+        <input type="file" id="fileInput" accept=".stl" multiple hidden>
+        <div class="dropzone-content">
+          <div class="dropzone-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
           </div>
-          <div class="result-sub">в т.ч. весь порошок для камеры</div>
+          <p class="dropzone-text">Перетащите STL-файлы сюда</p>
+          <p class="dropzone-subtext">или <button type="button" id="browseBtn" class="link-btn">выберите файлы</button></p>
         </div>
-        <div class="result-block">
-          <div class="result-row highlight">
-            <span class="result-label">Себестоимость изделия</span>
-            <span class="result-value" id="costPrice">—</span>
-          </div>
-          <div class="result-sub">материал в детали + потери + работы + расходники</div>
-        </div>
-        <div class="result-block primary-result">
-          <div class="result-row highlight">
-            <span class="result-label">Отпускная цена</span>
-            <span class="result-value" id="sellPrice">—</span>
-          </div>
-          <div class="result-sub">себестоимость + маржа + накладные</div>
-        </div>
-        <div class="result-block">
-          <div class="result-row">
-            <span class="result-label">Цена за партию</span>
-            <span class="result-value" id="batchPrice">—</span>
-          </div>
-        </div>
-      </section>
+      </div>
+    </section>
 
-      <section class="panel glass breakdown-panel">
-        <h2>Детализация</h2>
-        <div class="breakdown" id="breakdown">
-          <p class="note">Нажмите «Рассчитать» для детализации</p>
+    <!-- Models Table -->
+    <section class="table-section">
+      <div class="table-header">
+        <h2>Список моделей</h2>
+        <button type="button" id="clearAllBtn" class="btn-secondary" disabled>Очистить всё</button>
+      </div>
+      
+      <div class="table-wrapper">
+        <table id="modelsTable">
+          <thead>
+            <tr>
+              <th class="col-num sortable" data-sort="num">№ <span class="sort-icon"></span></th>
+              <th class="col-name sortable" data-sort="name">Наименование <span class="sort-icon"></span></th>
+              <th class="col-volume sortable" data-sort="volume">Объём, см³ <span class="sort-icon"></span></th>
+              <th class="col-price sortable" data-sort="price">Цена/шт, ₽ <span class="sort-icon"></span></th>
+              <th class="col-qty sortable" data-sort="qty">Кол-во <span class="sort-icon"></span></th>
+              <th class="col-total sortable" data-sort="total">Стоимость, ₽ <span class="sort-icon"></span></th>
+              <th class="col-actions"></th>
+            </tr>
+          </thead>
+          <tbody id="modelsBody">
+            <!-- Models will be added here -->
+          </tbody>
+          <tfoot id="modelsFoot" class="hidden">
+            <tr>
+              <td colspan="5" class="total-label">Итого:</td>
+              <td class="total-value" id="grandTotal">0 ₽</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+        
+        <div id="emptyState" class="empty-state">
+          <p>Загрузите STL-файлы для начала работы</p>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section class="panel glass export-panel">
-        <h2>Экспорт</h2>
-        <div class="form-row">
-          <label>№ позиции
-            <input type="number" id="lineIndex" value="1" step="1" min="1">
+    <!-- Export Section -->
+    <section class="export-section" id="exportSection">
+      <h2>Экспорт</h2>
+      
+      <div class="export-controls">
+        <div class="columns-select">
+          <span class="columns-label">Колонки:</span>
+          <label class="checkbox-item">
+            <input type="checkbox" id="colNum" checked>
+            <span>№</span>
           </label>
-          <label>Название детали
-            <input type="text" id="partName" value="Деталь SLM">
+          <label class="checkbox-item">
+            <input type="checkbox" id="colName" checked>
+            <span>Наименование</span>
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" id="colVolume" checked>
+            <span>Объём</span>
+          </label>
+          <select id="volumeUnit" class="unit-select">
+            <option value="cm3">см³</option>
+            <option value="mm3">мм³</option>
+          </select>
+          <label class="checkbox-item">
+            <input type="checkbox" id="colPrice" checked>
+            <span>Цена/шт</span>
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" id="colQty" checked>
+            <span>Кол-во</span>
+          </label>
+          <label class="checkbox-item">
+            <input type="checkbox" id="colTotal" checked>
+            <span>Стоимость</span>
           </label>
         </div>
-        <div class="export-buttons">
-          <button id="copyRow" class="ghost">Скопировать строку</button>
-          <button id="downloadCsv" class="ghost">Скачать CSV</button>
-        </div>
-        <div class="export-preview" id="exportPreview">№ - Деталь - Цена/шт - Кол-во - Итого</div>
-      </section>
-    </div>
-  </main>
+        
+        <button type="button" id="copyBtn" class="btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          Скопировать
+        </button>
+      </div>
+      
+      <div class="export-preview">
+        <div class="preview-label">Превью:</div>
+        <pre id="exportPreview" class="preview-content">—</pre>
+      </div>
+    </section>
+  </div>
 
   <script src="app.js"></script>
 </body>
 </html>
-
