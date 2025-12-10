@@ -1,0 +1,13 @@
+{
+    "name": "3d-quotation-ecosystem",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Экосистема инструментов для оценки 3D-печати",
+    "scripts": {
+        "dev": "pnpm --parallel -r dev",
+        "build": "pnpm -r build"
+    },
+    "keywords": ["3d-printing", "quotation","calculator"],
+    "author": "Veniamin Brykin",
+    "license": "MIT"
+}

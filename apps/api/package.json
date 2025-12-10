@@ -1,0 +1,18 @@
+{
+  "name": "@3dq/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend API для 3D Quotation",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^8.5.0",
+    "@pinojs/redact": "^0.4.0",
+    "dotenv": "^16.3.1",
+    "fastify": "^4.25.0"
+  }
+}

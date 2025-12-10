@@ -1,0 +1,10 @@
+{
+  "name": "@3dq/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Frontend для 3D Quotation",
+  "scripts": {
+    "dev": "python -m http.server 3000",
+    "start": "python -m http.server 3000"
+  }
+}
