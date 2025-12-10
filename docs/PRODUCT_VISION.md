@@ -1,4 +1,4 @@
-# SLS Ecosystem — Видение продукта
+# 3D Quotation Ecosystem — Видение продукта
 
 ## Миссия
 
